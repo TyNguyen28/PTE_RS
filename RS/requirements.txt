@@ -1,3 +1,4 @@
 gtts
 streamlit
 requests
+SpeechRecognition
