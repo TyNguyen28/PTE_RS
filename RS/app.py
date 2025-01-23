@@ -5,6 +5,15 @@ import string
 import difflib
 import numpy as np
 import pandas as pd
+import streamlit as st
+from gtts import gTTS
+import os
+import string
+import time
+import difflib
+import numpy as np
+import pandas as pd
+import speech_recognition as sr
 
 # Function to play audio
 def play_audio(file_path):
