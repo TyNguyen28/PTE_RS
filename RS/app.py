@@ -5,11 +5,20 @@ import string
 import difflib
 import numpy as np
 import pandas as pd
-import speech_recognition as sr
+from scipy.io import wavfile
 
 # Function to play audio
 def play_audio(file_path):
     st.audio(file_path, format='audio/mp3')
+
+# Function to process the uploaded audio file
+def process_uploaded_audio(file):
+    try:
+        fs, data = wavfile.read(file)
+        return data, fs
+    except Exception as e:
+        st.error(f"An error occurred while processing the audio: {e}")
+        return None, None
 
 # Main application
 def main():
@@ -46,53 +55,21 @@ def main():
 
         st.info("Click play to listen to the sentence and then repeat it.")
 
-        # Step 3: Record and Recognize Speech
-        st.subheader("Step 3: Record Your Speech")
-        st.warning("Ensure your microphone is enabled before starting!")
+        # Step 3: Upload and Process Speech
+        st.subheader("Step 3: Upload Your Speech Recording")
+        st.warning("Ensure your audio is in WAV format.")
 
-        record_btn = st.button("Start Recording")
-        if record_btn:
-            try:
-                recognizer = sr.Recognizer()
-                with sr.Microphone() as source:
-                    st.info("Recording... Please repeat the sentence.")
-                    recognizer.adjust_for_ambient_noise(source)
-                    audio = recognizer.listen(source, timeout=5)
+        uploaded_file = st.file_uploader("Upload your recorded audio file", type=['wav'])
+        if uploaded_file is not None:
+            _, fs = process_uploaded_audio(uploaded_file)
+            if fs:
+                st.success("Audio uploaded and processed successfully!")
 
-                recognized_text = recognizer.recognize_google(audio)
-                st.success(f"Recognized Text: {recognized_text}")
-
-                # Step 4: Calculate Scores
-                input_sentence_no_punctuation = selected_sentence.translate(str.maketrans('', '', string.punctuation))
-                recognized_text_no_punctuation = recognized_text.translate(str.maketrans('', '', string.punctuation))
-
-                # Content Score
-                words_in_input = input_sentence_no_punctuation.split()
-                words_in_recognized = recognized_text_no_punctuation.split()
-                matched_words = sum(1 for word in words_in_input if word in words_in_recognized)
-                content_percentage = (matched_words / len(words_in_input)) * 100
-                content_score = 3 if content_percentage == 100 else 2 if content_percentage >= 50 else 1 if content_percentage >= 25 else 0
-
-                # Fluency Score
-                num_words = len(recognized_text.split())
-                fluency_score = round(5 if num_words >= 6 else 4 if num_words >= 4 else 3 if num_words >= 3 else 2 if num_words == 2 else 1, 1)
-
-                # Pronunciation Score
-                seq = difflib.SequenceMatcher(None, input_sentence_no_punctuation, recognized_text_no_punctuation)
-                pronunciation_score = np.round(seq.ratio() * 5, 1)
-
-                # Total Score
-                total_score = content_score + pronunciation_score + fluency_score
-
-                # Display Results
+                # Step 4: Placeholder for Speech Recognition and Scoring
                 st.subheader("Grading Results")
-                st.metric("Content Score", f"{content_score}/3")
-                st.metric("Pronunciation Score", f"{pronunciation_score}/5")
-                st.metric("Fluency Score", f"{fluency_score}/5")
-                st.metric("Total Score", f"{total_score}/13")
-
-            except Exception as e:
-                st.error(f"An error occurred: {e}")
+                st.warning("Speech recognition and scoring will be added here in future updates.")
+            else:
+                st.error("Failed to process the uploaded audio.")
 
 # Run the application
 if __name__ == "__main__":
