@@ -12,38 +12,22 @@ import speech_recognition as sr
 def play_audio(file_path):
     st.audio(file_path, format='audio/mp3')
 
-# Function to process the uploaded file
-def process_uploaded_file(uploaded_file):
-    if uploaded_file.name.endswith('.csv'):
-        return pd.read_csv(uploaded_file)['Sentence'].tolist()
-    elif uploaded_file.name.endswith('.txt'):
-        return uploaded_file.read().decode('utf-8').splitlines()
-    else:
-        st.error("Unsupported file type. Please upload a .csv or .txt file.")
-        return []
-
 # Main application
 def main():
     st.title("🎙️ Speech Grader App with Question Bank")
     st.markdown("Evaluate your speaking fluency, pronunciation, and content match!")
 
-    # Check if RS_QBs.csv exists and load it automatically
-    default_sentences = []
-    if os.path.exists('RS_QBs.csv'):
-        default_sentences = pd.read_csv('RS_QBs.csv', encoding='ISO-8859-1')['Sentence'].tolist()
-        st.success(f"Loaded default question bank with {len(default_sentences)} sentences.")
-
-    # Upload question bank
-    st.subheader("Upload a Question Bank")
-    uploaded_file = st.file_uploader("Upload a CSV or TXT file containing sentences.", type=['csv', 'txt'])
-
-    sentences = default_sentences
-    if uploaded_file is not None:
-        sentences = process_uploaded_file(uploaded_file)
-        if sentences:
-            st.success(f"Successfully loaded {len(sentences)} sentences from the uploaded file.")
-            st.write("### Available Sentences:")
-            st.write(sentences)
+    # Load default question bank
+    question_bank_path = 'QB.csv'
+    sentences = []
+    if os.path.exists(question_bank_path):
+        try:
+            sentences = pd.read_csv(question_bank_path, encoding='ISO-8859-1')['Sentence'].tolist()
+            st.success(f"Loaded default question bank with {len(sentences)} sentences.")
+        except Exception as e:
+            st.error(f"An error occurred while loading the question bank: {e}")
+    else:
+        st.error(f"Default question bank not found at {question_bank_path}. Please ensure it is in the app directory.")
 
     # Step 1: Input sentence
     st.subheader("Step 1: Select or Input a Sentence")
