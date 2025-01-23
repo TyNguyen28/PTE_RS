@@ -4,3 +4,4 @@ pandas
 numpy
 SpeechRecognition
 streamlit-webrtc
+streamlit-webrtc==0.45.0
