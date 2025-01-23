@@ -71,8 +71,14 @@ def main():
 
         record_btn = st.button("Start Recording")
         if record_btn:
-            recognized_text = record_and_recognize_speech()
-            if recognized_text:
+            try:
+                recognizer = sr.Recognizer()
+                with sr.Microphone() as source:
+                    st.info("Recording... Please repeat the sentence.")
+                    recognizer.adjust_for_ambient_noise(source)
+                    audio = recognizer.listen(source, timeout=5)
+
+                recognized_text = recognizer.recognize_google(audio)
                 st.success(f"Recognized Text: {recognized_text}")
 
                 # Step 4: Calculate Scores
@@ -103,6 +109,9 @@ def main():
                 st.metric("Pronunciation Score", f"{pronunciation_score}/5")
                 st.metric("Fluency Score", f"{fluency_score}/5")
                 st.metric("Total Score", f"{total_score}/13")
+
+            except Exception as e:
+                st.error(f"An error occurred: {e}")
 
 # Run the application
 if __name__ == "__main__":
