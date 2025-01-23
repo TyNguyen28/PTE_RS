@@ -7,42 +7,43 @@ import numpy as np
 import pandas as pd
 import sounddevice as sd
 from scipy.io.wavfile import write
-import speech_recognition as sr
-from tempfile import NamedTemporaryFile
+import tempfile
+from google.cloud import speech
 
 # Function to play audio
 def play_audio(file_path):
     st.audio(file_path, format='audio/mp3')
 
-# Function to record and process audio using sounddevice
+# Function to record audio using sounddevice
 def record_audio(duration=5, sample_rate=44100):
     st.info(f"Recording for {duration} seconds...")
     try:
-        # Record audio
         audio = sd.rec(int(duration * sample_rate), samplerate=sample_rate, channels=1, dtype='int16')
         sd.wait()  # Wait until recording is finished
-        # Save to a temporary file
-        with NamedTemporaryFile(delete=False, suffix=".wav") as temp_file:
-            write(temp_file.name, sample_rate, audio)
-            return temp_file.name
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
+        write(temp_file.name, sample_rate, audio)  # Save audio as WAV file
+        return temp_file.name
     except Exception as e:
         st.error(f"An error occurred while recording: {e}")
         return None
 
-# Function to process and recognize speech
-def process_audio(file_path):
-    recognizer = sr.Recognizer()
+# Function to process audio with Google Cloud Speech-to-Text
+def process_audio_with_google(file_path):
     try:
-        with sr.AudioFile(file_path) as source:
-            st.info("Processing audio...")
-            audio = recognizer.record(source)
-            recognized_text = recognizer.recognize_google(audio)
-            return recognized_text
-    except sr.UnknownValueError:
-        st.error("Could not understand the audio. Please try again.")
-        return None
-    except sr.RequestError as e:
-        st.error(f"Speech recognition service error: {e}")
+        client = speech.SpeechClient()
+        with open(file_path, "rb") as audio_file:
+            content = audio_file.read()
+        audio = speech.RecognitionAudio(content=content)
+        config = speech.RecognitionConfig(
+            encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
+            sample_rate_hertz=44100,
+            language_code="en-US",
+        )
+        response = client.recognize(config=config, audio=audio)
+        for result in response.results:
+            return result.alternatives[0].transcript
+    except Exception as e:
+        st.error(f"An error occurred during speech recognition: {e}")
         return None
 
 # Main application
@@ -88,7 +89,7 @@ def main():
         if record_btn:
             temp_audio_path = record_audio()
             if temp_audio_path:
-                recognized_text = process_audio(temp_audio_path)
+                recognized_text = process_audio_with_google(temp_audio_path)
                 if recognized_text:
                     st.success(f"Recognized Text: {recognized_text}")
 
