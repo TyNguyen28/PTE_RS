@@ -11,7 +11,7 @@ import speech_recognition as sr
 def play_audio(file_path):
     st.audio(file_path, format='audio/mp3')
 
-# Function to record and recognize audio using PyAudio via SpeechRecognition
+# Function to record and recognize audio using SpeechRecognition
 def record_audio():
     try:
         recognizer = sr.Recognizer()
