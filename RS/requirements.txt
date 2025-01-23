@@ -1,4 +1,6 @@
-gtts
 streamlit
-requests
+gTTS
+pandas
+numpy
 SpeechRecognition
+sounddevice
