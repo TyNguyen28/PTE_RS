@@ -3,5 +3,3 @@ gTTS
 pandas
 numpy
 SpeechRecognition
-sounddevice
-https://files.pythonhosted.org/packages/69/20/7d4a4e5e839eac85d1ec9e6d2dce14ad97c8d75fef460eae21e95f3c73ab/PyAudio-0.2.11-cp39-cp39-manylinux1_x86_64.whl
