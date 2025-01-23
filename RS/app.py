@@ -6,10 +6,14 @@ import difflib
 import numpy as np
 import pandas as pd
 import speech_recognition as sr
+from tempfile import NamedTemporaryFile
 
 # Function to play audio
-def play_audio(file_path):
-    st.audio(file_path, format='audio/mp3')
+def play_audio_with_cleanup(text):
+    with NamedTemporaryFile(delete=True, suffix=".mp3") as temp_file:
+        tts = gTTS(text=text, lang='en')
+        tts.save(temp_file.name)
+        st.audio(temp_file.name, format='audio/mp3')
 
 # Main application
 def main():
@@ -19,13 +23,17 @@ def main():
     # Navigation menu
     page = st.selectbox("Choose a step", ["Step 1: Select a Sentence", "Step 2: Listen to the Sentence", "Step 3: Record Your Speech"])
 
+    # Initialize session state
+    if "selected_sentence" not in st.session_state:
+        st.session_state.selected_sentence = ""
+
     # Load default question bank
     try:
         default_sentences = pd.read_csv('QB.csv', encoding='ISO-8859-1')['Sentence'].tolist()
         st.success(f"Loaded default question bank with {len(default_sentences)} sentences.")
     except FileNotFoundError:
-        st.error("Default question bank not found. Please upload `QB.csv` to the app's directory.")
-        default_sentences = []
+        st.error("Default question bank not found. Using a default sentence.")
+        default_sentences = ["This is an example sentence."]
 
     # Step 1: Select a Sentence
     if page == "Step 1: Select a Sentence":
@@ -35,24 +43,21 @@ def main():
             st.session_state.selected_sentence = selected_sentence
             st.success("Sentence selected!")
         else:
-            st.warning("No sentences available. Please ensure the question bank is loaded.")
+            st.warning("No sentences available.")
 
     # Step 2: Listen to the Sentence
     elif page == "Step 2: Listen to the Sentence":
-        if 'selected_sentence' in st.session_state:
+        if st.session_state.selected_sentence:
             selected_sentence = st.session_state.selected_sentence
             st.subheader("Step 2: Listen to the Sentence")
-            tts = gTTS(text=selected_sentence, lang='en')
-            tts.save("output.mp3")
-            play_audio("output.mp3")
-
+            play_audio_with_cleanup(selected_sentence)
             st.info("Click play to listen to the sentence and then repeat it.")
         else:
             st.warning("Please select a sentence in Step 1 first.")
 
     # Step 3: Record Your Speech
     elif page == "Step 3: Record Your Speech":
-        if 'selected_sentence' in st.session_state:
+        if st.session_state.selected_sentence:
             selected_sentence = st.session_state.selected_sentence
             st.subheader("Step 3: Record Your Speech")
             st.warning("Ensure your microphone is enabled before starting!")
@@ -64,7 +69,7 @@ def main():
                     with sr.Microphone() as source:
                         st.info("Recording... Please repeat the sentence.")
                         recognizer.adjust_for_ambient_noise(source)
-                        audio = recognizer.listen(source, timeout=5)
+                        audio = recognizer.listen(source, timeout=10)
 
                     recognized_text = recognizer.recognize_google(audio)
                     st.success(f"Recognized Text: {recognized_text}")
@@ -96,8 +101,10 @@ def main():
                     st.metric("Fluency Score", f"{fluency_score}/5")
                     st.metric("Total Score", f"{total_score}/13")
 
-                except Exception as e:
-                    st.error(f"An error occurred: {e}")
+                except sr.UnknownValueError:
+                    st.error("Could not understand the audio. Please try again.")
+                except sr.RequestError as e:
+                    st.error(f"Speech recognition service error: {e}")
         else:
             st.warning("Please select a sentence in Step 1 first.")
 
