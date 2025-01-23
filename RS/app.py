@@ -17,6 +17,10 @@ def play_audio_with_cleanup(text):
 
 # Main application
 def main():
+    # Debugging lines
+    st.write("Current Directory:", os.getcwd())
+    st.write("Files in Directory:", os.listdir(os.getcwd()))
+
     st.title("🎙️ Speech Grader App with Question Bank")
     st.markdown("Evaluate your speaking fluency, pronunciation, and content match!")
 
