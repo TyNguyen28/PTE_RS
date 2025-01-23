@@ -3,4 +3,4 @@ gTTS
 pandas
 numpy
 SpeechRecognition
-PyAudio
+streamlit-webrtc
