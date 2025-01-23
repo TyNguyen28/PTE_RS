@@ -14,7 +14,7 @@ class AudioProcessor(AudioProcessorBase):
         self.recognizer = sr.Recognizer()
         self.result_text = ""
 
-    def recv(self, frame):
+    def recv(self, frame: av.AudioFrame) -> av.AudioFrame:
         audio_path = "temp.wav"
         with open(audio_path, "wb") as f:
             f.write(frame.to_ndarray().tobytes())
