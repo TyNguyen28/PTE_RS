@@ -21,10 +21,10 @@ def main():
 
     # Load default question bank
     try:
-        default_sentences = pd.read_csv('RS_QBs.csv', encoding='ISO-8859-1')['Sentence'].tolist()
+        default_sentences = pd.read_csv('QB.csv', encoding='ISO-8859-1')['Sentence'].tolist()
         st.success(f"Loaded default question bank with {len(default_sentences)} sentences.")
     except FileNotFoundError:
-        st.error("Default question bank not found. Please upload `RS_QBs.csv` to the app's directory.")
+        st.error("Default question bank not found. Please upload `QB.csv` to the app's directory.")
         default_sentences = []
 
     # Step 1: Select a Sentence
