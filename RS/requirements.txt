@@ -4,4 +4,4 @@ pandas
 numpy
 sounddevice
 scipy
-SpeechRecognition
+google-cloud-speech
