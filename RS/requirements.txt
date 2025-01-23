@@ -2,4 +2,5 @@ streamlit
 gTTS
 pandas
 numpy
-scipy
+SpeechRecognition
+PyAudio
