@@ -5,46 +5,34 @@ import string
 import difflib
 import numpy as np
 import pandas as pd
-import sounddevice as sd
-from scipy.io.wavfile import write
-import tempfile
-from google.cloud import speech
+import speech_recognition as sr
+from streamlit_webrtc import webrtc_streamer, AudioProcessorBase
+
+# Audio Processor for speech recognition
+class AudioProcessor(AudioProcessorBase):
+    def __init__(self):
+        self.recognizer = sr.Recognizer()
+        self.result_text = ""
+
+    def recv(self, frame):
+        # Save audio as temporary WAV file
+        audio_path = "temp.wav"
+        with open(audio_path, "wb") as f:
+            f.write(frame.to_ndarray().tobytes())
+
+        try:
+            with sr.AudioFile(audio_path) as source:
+                audio = self.recognizer.record(source)
+                self.result_text = self.recognizer.recognize_google(audio)
+        except Exception as e:
+            self.result_text = f"Error: {e}"
+
+        os.remove(audio_path)
+        return frame
 
 # Function to play audio
 def play_audio(file_path):
     st.audio(file_path, format='audio/mp3')
-
-# Function to record audio using sounddevice
-def record_audio(duration=5, sample_rate=44100):
-    st.info(f"Recording for {duration} seconds...")
-    try:
-        audio = sd.rec(int(duration * sample_rate), samplerate=sample_rate, channels=1, dtype='int16')
-        sd.wait()  # Wait until recording is finished
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
-        write(temp_file.name, sample_rate, audio)  # Save audio as WAV file
-        return temp_file.name
-    except Exception as e:
-        st.error(f"An error occurred while recording: {e}")
-        return None
-
-# Function to process audio with Google Cloud Speech-to-Text
-def process_audio_with_google(file_path):
-    try:
-        client = speech.SpeechClient()
-        with open(file_path, "rb") as audio_file:
-            content = audio_file.read()
-        audio = speech.RecognitionAudio(content=content)
-        config = speech.RecognitionConfig(
-            encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
-            sample_rate_hertz=44100,
-            language_code="en-US",
-        )
-        response = client.recognize(config=config, audio=audio)
-        for result in response.results:
-            return result.alternatives[0].transcript
-    except Exception as e:
-        st.error(f"An error occurred during speech recognition: {e}")
-        return None
 
 # Main application
 def main():
@@ -81,46 +69,51 @@ def main():
 
         st.info("Click play to listen to the sentence and then repeat it.")
 
-        # Step 3: Record and Recognize Speech
+        # Step 3: Record Speech
         st.subheader("Step 3: Record Your Speech")
         st.warning("Ensure your microphone is enabled before starting!")
 
-        record_btn = st.button("Start Recording")
-        if record_btn:
-            temp_audio_path = record_audio()
-            if temp_audio_path:
-                recognized_text = process_audio_with_google(temp_audio_path)
-                if recognized_text:
-                    st.success(f"Recognized Text: {recognized_text}")
+        webrtc_ctx = webrtc_streamer(
+            key="speech-recorder",
+            mode="sendrecv",
+            audio_processor_factory=AudioProcessor,
+            media_stream_constraints={"audio": True},
+            async_processing=True,
+        )
 
-                    # Step 4: Calculate Scores
-                    input_sentence_no_punctuation = selected_sentence.translate(str.maketrans('', '', string.punctuation))
-                    recognized_text_no_punctuation = recognized_text.translate(str.maketrans('', '', string.punctuation))
+        if webrtc_ctx and webrtc_ctx.audio_processor:
+            recognized_text = webrtc_ctx.audio_processor.result_text
+            if recognized_text:
+                st.success(f"Recognized Text: {recognized_text}")
 
-                    # Content Score
-                    words_in_input = input_sentence_no_punctuation.split()
-                    words_in_recognized = recognized_text_no_punctuation.split()
-                    matched_words = sum(1 for word in words_in_input if word in words_in_recognized)
-                    content_percentage = (matched_words / len(words_in_input)) * 100
-                    content_score = 3 if content_percentage == 100 else 2 if content_percentage >= 50 else 1 if content_percentage >= 25 else 0
+                # Step 4: Calculate Scores
+                input_sentence_no_punctuation = selected_sentence.translate(str.maketrans('', '', string.punctuation))
+                recognized_text_no_punctuation = recognized_text.translate(str.maketrans('', '', string.punctuation))
 
-                    # Fluency Score
-                    num_words = len(recognized_text.split())
-                    fluency_score = round(5 if num_words >= 6 else 4 if num_words >= 4 else 3 if num_words >= 3 else 2 if num_words == 2 else 1, 1)
+                # Content Score
+                words_in_input = input_sentence_no_punctuation.split()
+                words_in_recognized = recognized_text_no_punctuation.split()
+                matched_words = sum(1 for word in words_in_input if word in words_in_recognized)
+                content_percentage = (matched_words / len(words_in_input)) * 100
+                content_score = 3 if content_percentage == 100 else 2 if content_percentage >= 50 else 1 if content_percentage >= 25 else 0
 
-                    # Pronunciation Score
-                    seq = difflib.SequenceMatcher(None, input_sentence_no_punctuation, recognized_text_no_punctuation)
-                    pronunciation_score = np.round(seq.ratio() * 5, 1)
+                # Fluency Score
+                num_words = len(recognized_text.split())
+                fluency_score = round(5 if num_words >= 6 else 4 if num_words >= 4 else 3 if num_words >= 3 else 2 if num_words == 2 else 1, 1)
 
-                    # Total Score
-                    total_score = content_score + pronunciation_score + fluency_score
+                # Pronunciation Score
+                seq = difflib.SequenceMatcher(None, input_sentence_no_punctuation, recognized_text_no_punctuation)
+                pronunciation_score = np.round(seq.ratio() * 5, 1)
 
-                    # Display Results
-                    st.subheader("Grading Results")
-                    st.metric("Content Score", f"{content_score}/3")
-                    st.metric("Pronunciation Score", f"{pronunciation_score}/5")
-                    st.metric("Fluency Score", f"{fluency_score}/5")
-                    st.metric("Total Score", f"{total_score}/13")
+                # Total Score
+                total_score = content_score + pronunciation_score + fluency_score
+
+                # Display Results
+                st.subheader("Grading Results")
+                st.metric("Content Score", f"{content_score}/3")
+                st.metric("Pronunciation Score", f"{pronunciation_score}/5")
+                st.metric("Fluency Score", f"{fluency_score}/5")
+                st.metric("Total Score", f"{total_score}/13")
 
 # Run the application
 if __name__ == "__main__":
