@@ -5,24 +5,29 @@ import string
 import difflib
 import numpy as np
 import pandas as pd
-import sounddevice as sd
-from scipy.io.wavfile import write
+import speech_recognition as sr
 
 # Function to play audio
 def play_audio(file_path):
     st.audio(file_path, format='audio/mp3')
 
-# Function to record audio using sounddevice
-def record_audio(duration=5, filename="output.wav", fs=44100):
-    st.info(f"Recording for {duration} seconds...")
+# Function to record and recognize audio using PyAudio via SpeechRecognition
+def record_audio():
     try:
-        audio_data = sd.rec(int(duration * fs), samplerate=fs, channels=1, dtype='int16')
-        sd.wait()  # Wait until recording is finished
-        write(filename, fs, audio_data)  # Save as WAV file
-        st.success("Recording completed successfully!")
-        return filename
-    except Exception as e:
-        st.error(f"An error occurred while recording: {e}")
+        recognizer = sr.Recognizer()
+        with sr.Microphone() as source:
+            st.info("Recording... Please repeat the sentence.")
+            recognizer.adjust_for_ambient_noise(source)
+            audio = recognizer.listen(source, timeout=10)
+
+        # Recognize the audio using Google's speech recognition
+        recognized_text = recognizer.recognize_google(audio)
+        return recognized_text
+    except sr.UnknownValueError:
+        st.error("Could not understand the audio. Please try again.")
+        return None
+    except sr.RequestError as e:
+        st.error(f"Speech recognition service error: {e}")
         return None
 
 # Main application
@@ -66,10 +71,38 @@ def main():
 
         record_btn = st.button("Start Recording")
         if record_btn:
-            filename = record_audio()
-            if filename:
-                st.info(f"Audio recorded and saved as {filename}.")
-                # Speech recognition could be added here if needed, using the recorded audio file
+            recognized_text = record_audio()
+            if recognized_text:
+                st.success(f"Recognized Text: {recognized_text}")
+
+                # Step 4: Calculate Scores
+                input_sentence_no_punctuation = selected_sentence.translate(str.maketrans('', '', string.punctuation))
+                recognized_text_no_punctuation = recognized_text.translate(str.maketrans('', '', string.punctuation))
+
+                # Content Score
+                words_in_input = input_sentence_no_punctuation.split()
+                words_in_recognized = recognized_text_no_punctuation.split()
+                matched_words = sum(1 for word in words_in_input if word in words_in_recognized)
+                content_percentage = (matched_words / len(words_in_input)) * 100
+                content_score = 3 if content_percentage == 100 else 2 if content_percentage >= 50 else 1 if content_percentage >= 25 else 0
+
+                # Fluency Score
+                num_words = len(recognized_text.split())
+                fluency_score = round(5 if num_words >= 6 else 4 if num_words >= 4 else 3 if num_words >= 3 else 2 if num_words == 2 else 1, 1)
+
+                # Pronunciation Score
+                seq = difflib.SequenceMatcher(None, input_sentence_no_punctuation, recognized_text_no_punctuation)
+                pronunciation_score = np.round(seq.ratio() * 5, 1)
+
+                # Total Score
+                total_score = content_score + pronunciation_score + fluency_score
+
+                # Display Results
+                st.subheader("Grading Results")
+                st.metric("Content Score", f"{content_score}/3")
+                st.metric("Pronunciation Score", f"{pronunciation_score}/5")
+                st.metric("Fluency Score", f"{fluency_score}/5")
+                st.metric("Total Score", f"{total_score}/13")
 
 # Run the application
 if __name__ == "__main__":
