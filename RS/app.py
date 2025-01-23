@@ -18,7 +18,7 @@ def main():
     st.markdown("Evaluate your speaking fluency, pronunciation, and content match!")
 
     # Load default question bank
-    question_bank_path = 'QB.csv'
+    question_bank_path = 'RS/QB.csv'
     sentences = []
     if os.path.exists(question_bank_path):
         try:
