@@ -16,9 +16,6 @@ def main():
     st.title("🎙️ Speech Grader App with Question Bank")
     st.markdown("Evaluate your speaking fluency, pronunciation, and content match!")
 
-    # Display the layout image
-    st.image("layout.png", caption="App Layout", use_column_width=True)
-
     # Navigation menu
     page = st.selectbox("Choose a step", ["Step 1: Select a Sentence", "Step 2: Listen to the Sentence", "Step 3: Record Your Speech"])
 
