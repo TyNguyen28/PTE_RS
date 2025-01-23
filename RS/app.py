@@ -99,14 +99,12 @@ def main():
 
         webrtc_ctx = webrtc_streamer(
             key="speech-recorder",
-            mode="sendrecv",
             audio_processor_factory=AudioProcessor,
-            media_stream_constraints={"audio": True},
-            async_processing=True,
             rtc_configuration={
                 "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
             }
         )
+
 
         if webrtc_ctx and webrtc_ctx.audio_processor:
             recognized_text = webrtc_ctx.audio_processor.result_text
