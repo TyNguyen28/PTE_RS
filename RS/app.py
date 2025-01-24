@@ -5,72 +5,11 @@ import string
 import difflib
 import numpy as np
 import pandas as pd
-import tempfile
-import wave
 from google.cloud import speech
-from streamlit_webrtc import webrtc_streamer, WebRtcMode, AudioProcessorBase
-import av
-
-
-# Audio processor class for streamlit-webrtc
-class AudioProcessor(AudioProcessorBase):
-    def __init__(self):
-        self.frames = []
-
-    def recv(self, frame: av.AudioFrame) -> av.AudioFrame:
-        # Append audio frames to the buffer
-        self.frames.append(frame.to_ndarray())
-        return frame
-
-    def save_audio(self, filename: str):
-        # Combine frames and save them as a WAV file
-        audio_data = np.concatenate(self.frames, axis=1).flatten()
-        with wave.open(filename, "wb") as wf:
-            wf.setnchannels(1)  # Mono audio
-            wf.setsampwidth(2)  # Sample width in bytes
-            wf.setframerate(44100)  # Sample rate
-            wf.writeframes(audio_data.tobytes())
-
 
 # Function to play audio
 def play_audio(file_path):
     st.audio(file_path, format='audio/mp3')
-
-
-# Function to process the uploaded file
-def process_uploaded_file(uploaded_file):
-    if uploaded_file.name.endswith('.csv'):
-        return pd.read_csv(uploaded_file)['Sentence'].tolist()
-    elif uploaded_file.name.endswith('.txt'):
-        return uploaded_file.read().decode('utf-8').splitlines()
-    else:
-        st.error("Unsupported file type. Please upload a .csv or .txt file.")
-        return []
-
-
-# Function to record audio using streamlit-webrtc
-def record_audio(duration=5, filename="output.wav"):
-    webrtc_ctx = webrtc_streamer(
-        key="audio",
-        mode=WebRtcMode.SENDRECV,
-        audio_processor_factory=AudioProcessor,
-        media_stream_constraints={"audio": True, "video": False},
-    )
-
-    if webrtc_ctx and webrtc_ctx.state.playing:
-        st.session_state.audio_processor = webrtc_ctx.audio_processor
-        st.session_state.recording = True
-        st.info("Recording in progress... Speak now!")
-
-    if st.session_state.get("recording") and not webrtc_ctx.state.playing:
-        st.session_state.recording = False
-        st.info("Recording stopped.")
-        audio_processor = st.session_state.audio_processor
-        if audio_processor:
-            audio_processor.save_audio(filename)
-            return filename
-    return None
-
 
 # Function to transcribe audio using Google Cloud Speech-to-Text
 def transcribe_audio_google(audio_file_path):
@@ -86,95 +25,72 @@ def transcribe_audio_google(audio_file_path):
     response = client.recognize(config=config, audio=audio)
     return response
 
-
 # Main application
 def main():
-    st.title("🎙️ Speech Grader App with Question Bank")
+    st.title("🎙️ Speech Grader App")
     st.markdown("Evaluate your speaking fluency, pronunciation, and content match!")
 
-    # Load default question bank
-    default_sentences = []
-    if os.path.exists('QB.csv'):
-        default_sentences = pd.read_csv('QB.csv', encoding='ISO-8859-1')['Sentence'].tolist()
-        st.success(f"Loaded default question bank with {len(default_sentences)} sentences.")
-
-    # Upload question bank
-    st.subheader("Upload a Question Bank")
-    uploaded_file = st.file_uploader("Upload a CSV or TXT file containing sentences.", type=['csv', 'txt'])
-
-    sentences = default_sentences
-    if uploaded_file is not None:
-        sentences = process_uploaded_file(uploaded_file)
-        if sentences:
-            st.success(f"Successfully loaded {len(sentences)} sentences from the uploaded file.")
-            st.write("### Available Sentences:")
-            st.write(sentences)
-
-    # Step 1: Input sentence
-    st.subheader("Step 1: Select or Input a Sentence")
-    if sentences:
-        selected_sentence = st.selectbox("Choose a sentence to practice:", sentences)
-    else:
-        selected_sentence = st.text_input("Or enter a sentence manually:")
+    # Step 1: Input Sentence
+    st.subheader("Step 1: Input a Sentence")
+    default_sentence = "This is a sample sentence to repeat."
+    selected_sentence = st.text_input("Enter or modify the sentence below:", default_sentence)
 
     if selected_sentence:
         st.success("Sentence selected!")
 
-        # Step 2: Convert text to speech
+        # Step 2: Convert Text to Speech
         st.subheader("Step 2: Listen to the Sentence")
         tts = gTTS(text=selected_sentence, lang='en')
-        tts.save("output.mp3")
-        play_audio("output.mp3")
+        tts.save("sentence.mp3")
+        play_audio("sentence.mp3")
 
-        st.info("Click play to listen to the sentence and then repeat it.")
+        # Step 3: Upload Speech
+        st.subheader("Step 3: Upload Your Speech")
+        uploaded_file = st.file_uploader("Upload a WAV file of your speech", type=["wav"])
 
-        # Step 3: Record and Recognize Speech
-        st.subheader("Step 3: Record Your Speech")
-        st.warning("Ensure your microphone is enabled before starting!")
+        if uploaded_file is not None:
+            st.audio(uploaded_file, format="audio/wav")
+            st.info("Transcribing your speech...")
 
-        record_btn = st.button("Start Recording")
-        if record_btn:
+            # Transcribe uploaded audio
             try:
-                filename = record_audio()
-                if filename:
-                    st.audio(filename)
-                    st.info("Transcribing audio...")
-                    response = transcribe_audio_google(filename)
-                    recognized_text = response.results[0].alternatives[0].transcript
-                    st.success(f"Recognized Text: {recognized_text}")
+                with open("temp_uploaded.wav", "wb") as f:
+                    f.write(uploaded_file.read())
+                response = transcribe_audio_google("temp_uploaded.wav")
+                recognized_text = response.results[0].alternatives[0].transcript
+                st.success(f"Recognized Text: {recognized_text}")
 
-                    # Step 4: Calculate Scores
-                    input_sentence_no_punctuation = selected_sentence.translate(str.maketrans('', '', string.punctuation))
-                    recognized_text_no_punctuation = recognized_text.translate(str.maketrans('', '', string.punctuation))
+                # Grading logic
+                input_sentence_no_punctuation = selected_sentence.translate(str.maketrans('', '', string.punctuation))
+                recognized_text_no_punctuation = recognized_text.translate(str.maketrans('', '', string.punctuation))
 
-                    # Content Score
-                    words_in_input = input_sentence_no_punctuation.split()
-                    words_in_recognized = recognized_text_no_punctuation.split()
-                    matched_words = sum(1 for word in words_in_input if word in words_in_recognized)
-                    content_percentage = (matched_words / len(words_in_input)) * 100
-                    content_score = 3 if content_percentage == 100 else 2 if content_percentage >= 50 else 1 if content_percentage >= 25 else 0
+                # Content Score
+                words_in_input = input_sentence_no_punctuation.split()
+                words_in_recognized = recognized_text_no_punctuation.split()
+                matched_words = sum(1 for word in words_in_input if word in words_in_recognized)
+                content_percentage = (matched_words / len(words_in_input)) * 100
+                content_score = 3 if content_percentage == 100 else 2 if content_percentage >= 50 else 1 if content_percentage >= 25 else 0
 
-                    # Fluency Score
-                    num_words = len(recognized_text.split())
-                    fluency_score = 5 if num_words >= 6 else 4 if num_words >= 4 else 3 if num_words >= 3 else 2 if num_words == 2 else 1
+                # Fluency Score
+                num_words = len(recognized_text.split())
+                fluency_score = 5 if num_words >= 6 else 4 if num_words >= 4 else 3 if num_words >= 3 else 2 if num_words == 2 else 1
 
-                    # Pronunciation Score
-                    seq = difflib.SequenceMatcher(None, input_sentence_no_punctuation, recognized_text_no_punctuation)
-                    pronunciation_score = np.round(seq.ratio() * 5, 1)
+                # Pronunciation Score
+                seq = difflib.SequenceMatcher(None, input_sentence_no_punctuation, recognized_text_no_punctuation)
+                pronunciation_score = np.round(seq.ratio() * 5, 1)
 
-                    # Total Score
-                    total_score = content_score + pronunciation_score + fluency_score
+                # Total Score
+                total_score = content_score + pronunciation_score + fluency_score
 
-                    # Display Results
-                    st.subheader("Grading Results")
-                    st.metric("Content Score", f"{content_score}/3")
-                    st.metric("Pronunciation Score", f"{pronunciation_score}/5")
-                    st.metric("Fluency Score", f"{fluency_score}/5")
-                    st.metric("Total Score", f"{total_score}/13")
+                # Display Results
+                st.subheader("Grading Results")
+                st.metric("Content Score", f"{content_score}/3")
+                st.metric("Pronunciation Score", f"{pronunciation_score}/5")
+                st.metric("Fluency Score", f"{fluency_score}/5")
+                st.metric("Total Score", f"{total_score}/13")
 
             except Exception as e:
-                st.error(f"An error occurred: {e}")
-
+                st.error(f"An error occurred during transcription: {e}")
 
 # Run the application
 if __name__ == "__main__":
