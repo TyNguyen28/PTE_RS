@@ -6,6 +6,8 @@ import difflib
 import numpy as np
 import pandas as pd
 from google.cloud import speech
+import os
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/etc/secrets/google-credentials.json"
 
 # Function to play audio
 def play_audio(file_path):
