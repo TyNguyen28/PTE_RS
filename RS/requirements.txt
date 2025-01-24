@@ -4,4 +4,7 @@ pandas
 numpy
 SpeechRecognition
 streamlit-webrtc
-streamlit-webrtc==0.45.0
+pyaudio
+pydub
+google-cloud-speech
+av
